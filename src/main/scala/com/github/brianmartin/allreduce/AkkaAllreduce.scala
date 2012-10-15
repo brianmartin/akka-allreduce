@@ -1,4 +1,4 @@
-package com.github.brianmartin
+package com.github.brianmartin.allreduce
 
 import com.typesafe.config.ConfigFactory
 import akka.actor.Actor
@@ -149,7 +149,7 @@ object Runner {
 
   def main(args: Array[String]): Unit = {
 
-    if (args.size < 2) {
+    if (args.size < 3 || 4 < args.size ) {
       println("Usage worker: ./run hostname port id")
       println("Usage master: ./run master hostname port numWorkers")
       System.exit(0)
