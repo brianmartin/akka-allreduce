@@ -1,6 +1,6 @@
 package com.github.brianmartin
 
-//#imports
+import com.typesafe.config.ConfigFactory
 import akka.actor.Actor
 import akka.actor.ActorLogging
 import akka.actor.ActorRef
@@ -11,7 +11,6 @@ import akka.pattern.ask
 import akka.util.Timeout
 import scala.concurrent.util.duration._
 import scala.concurrent.Await
-//#imports
 
 import scala.collection.mutable.HashSet
 
@@ -142,37 +141,44 @@ class Allreduce(master: ActorRef, id: Int)(implicit system: ActorSystem) {
 object Runner {
 
   def main(args: Array[String]): Unit = {
-    implicit val system = ActorSystem("MySystem")
 
-    if (args.size < 1) {
-      println("Usage: give the id, and optionally the number of workers for running the master")
+    if (args.size < 2) {
+      println("Usage worker: ./run hostname port id")
+      println("Usage master: ./run master hostnmae port numWorkers")
       System.exit(0)
     }
 
-    if (args.size == 2) {
+    if (args.size == 4) {
+
+      val host = args(1)
+      val port = args(2).toInt
+      val n = args(3).toInt
+
+      val system = ActorSystem("AllreduceSystem",
+          ConfigFactory
+              .parseString("akka.remote.netty.hostname=\"" + host + "\"\n akka.remote.netty.port=\"" + port + "\"")
+              .withFallback(ConfigFactory.load()))
+
       val master = system.actorOf(Props[TreeMaster], name = "TreeMaster")
-      val id = args(0).toInt
-      val n = args(1).toInt
-      println("Master: " + master)
-      println("Master: " + master)
 
       master ! NumNodes(n)
     }
     else {
 
-      val id = args(0).toInt
+      val host = args(0)
+      val port = args(1).toInt
+      val id = args(2).toInt
 
-      val host = "127.0.0.1"
-      val port = "2552"
+      implicit val system = ActorSystem("AllreduceSystem",
+          ConfigFactory
+              .parseString("akka.remote.netty.hostname=\"127.0.0.1\"\n akka.remote.netty.port=\"" + (port + id + 1) + "\"")
+              .withFallback(ConfigFactory.load()))
 
-      val master = system.actorFor("akka://MySystem@" + host + ":" + port + "/user/TreeMaster")
-
-      val a = new Allreduce(master, id)
-
+      val master = system.actorFor("akka://AllreduceSystem@" + host + ":" + port + "/user/TreeMaster")
+      val a = new Allreduce(master, id)(system)
       val v = Array.fill[Double](5)(id.toDouble)
-      println("Waiting in " + id)
-
       println(a.allReduce(v).mkString(", "))
+
     }
   }
 
