@@ -117,13 +117,20 @@ class ARActor extends Actor with ActorLogging {
 
 }
 
-class Allreduce(master: ActorRef, id: Int)(implicit system: ActorSystem) {
+class Allreduce(masterHostAndPort: (String, Int), id: Int) {
 
   implicit val timeout = Timeout(5 seconds)
 
   var me: ActorRef = null
 
   private def init(): Unit = {
+    val system = ActorSystem("AllreduceSystem",
+        ConfigFactory
+            .parseString("akka.remote.netty.hostname=\"" + masterHostAndPort._1 + "\"\n akka.remote.netty.port=\"" + (masterHostAndPort._2 + id + 1) + "\"")
+            .withFallback(ConfigFactory.load()))
+
+    val master = system.actorFor("akka://AllreduceSystem@" + masterHostAndPort._1 + ":" + masterHostAndPort._2 + "/user/TreeMaster")
+
     me = system.actorOf(Props[ARActor], name = "AllreduceActor" + id)
     Await.result(master ? Node(me, id), 5 seconds)
     println("Recieved reponse from TreeMaster..")
@@ -144,7 +151,7 @@ object Runner {
 
     if (args.size < 2) {
       println("Usage worker: ./run hostname port id")
-      println("Usage master: ./run master hostnmae port numWorkers")
+      println("Usage master: ./run master hostname port numWorkers")
       System.exit(0)
     }
 
@@ -170,13 +177,7 @@ object Runner {
       val port = args(1).toInt
       val id = args(2).toInt
 
-      implicit val system = ActorSystem("AllreduceSystem",
-          ConfigFactory
-              .parseString("akka.remote.netty.hostname=\"127.0.0.1\"\n akka.remote.netty.port=\"" + (port + id + 1) + "\"")
-              .withFallback(ConfigFactory.load()))
-
-      val master = system.actorFor("akka://AllreduceSystem@" + host + ":" + port + "/user/TreeMaster")
-      val a = new Allreduce(master, id)(system)
+      val a = new Allreduce((host, port), id)
 
       var i = 1
       while (true) {
