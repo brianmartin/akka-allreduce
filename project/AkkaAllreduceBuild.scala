@@ -15,7 +15,8 @@ object AkkaAllreduceBuild extends Build {
       libraryDependencies ++= Seq(
         "com.typesafe.akka" % "akka-actor" % "2.1-SNAPSHOT" cross CrossVersion.full,
         "com.typesafe.akka" %% "akka-remote" % "2.1-SNAPSHOT" cross CrossVersion.full
-      )
+      ),
+      publishTo := Some(Resolver.file("file",  new File(Path.userHome.absolutePath+"/.m2/repository")))
     )
   )
 }
