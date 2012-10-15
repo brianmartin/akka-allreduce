@@ -162,6 +162,7 @@ object Runner {
       val master = system.actorOf(Props[TreeMaster], name = "TreeMaster")
 
       master ! NumNodes(n)
+
     }
     else {
 
@@ -176,8 +177,15 @@ object Runner {
 
       val master = system.actorFor("akka://AllreduceSystem@" + host + ":" + port + "/user/TreeMaster")
       val a = new Allreduce(master, id)(system)
-      val v = Array.fill[Double](5)(id.toDouble)
-      println(a.allReduce(v).mkString(", "))
+
+      var i = 1
+      while (true) {
+        val v = Array.fill[Double](5)(id.toDouble * i)
+        println("v: " + v.mkString(", "))
+        println(a.allReduce(v).mkString(", "))
+        Thread.sleep(300)
+        i += 1
+      }
 
     }
   }
