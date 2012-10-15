@@ -1,1 +1,6 @@
 Allreduce implementation for Akka.
+
+To run:
+
+  ./run-master.sh
+  ./run-workers.sh
