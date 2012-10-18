@@ -90,17 +90,17 @@ class ARActor extends Actor with ActorLogging {
         self ! Down(workingBuffer)
     }
     case Up(a) => { 
-      log.info("Recieved Up, waiting for the other children...")
+      log.info("Received Up, waiting for the other children...")
       recievedFrom += 1
       sumIntoBuffer(a)
     }
     case Side(a) => {
-      log.info("Recieved Side...")
+      log.info("Received Side...")
       side = sender
       self ! Up(a)
     }
     case Down(a) => { 
-      log.info("Recieved down, passing along to children...")
+      log.info("Received down, passing along to children...")
       val m = Down(a)
       side ! m
       children.foreach { c => c ! m}
@@ -141,14 +141,14 @@ class Allreduce(host: String, port: Int, id: Int) {
   private def init(): Unit = {
     val system = ActorSystem("AllreduceSystem",
         ConfigFactory
-            .parseString("akka.remote.netty.hostname=\"" + port + "\"\n akka.remote.netty.port=\"" + (port + id + 1) + "\"")
+            .parseString("akka.remote.netty.hostname=\"" + host + "\"\n akka.remote.netty.port=\"" + (port + id + 1) + "\"")
             .withFallback(ConfigFactory.load()))
 
     val master = system.actorFor("akka://AllreduceSystem@" + host + ":" + port + "/user/TreeMaster")
 
     me = system.actorOf(Props[ARActor], name = "AllreduceActor" + id)
     Await.result(master ? Node(me, id), 5 seconds)
-    println("Recieved reponse from TreeMaster..")
+    println("Received response from TreeMaster..")
   }
 
   def allReduce(a: Array[Double]): Unit = {
