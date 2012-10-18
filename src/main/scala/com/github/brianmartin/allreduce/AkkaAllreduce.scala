@@ -9,8 +9,8 @@ import akka.actor.Props
 
 import akka.pattern.ask
 import akka.util.Timeout
-import scala.concurrent.util.duration._
-import scala.concurrent.Await
+import akka.util.duration._
+import akka.dispatch.Await
 
 import scala.collection.mutable.HashSet
 
@@ -117,7 +117,22 @@ class ARActor extends Actor with ActorLogging {
 
 }
 
-class Allreduce(masterHostAndPort: (String, Int), id: Int) {
+object AllreduceMaster {
+
+  def apply(host: String, port: Int, numNodes: Int) {
+    val system = ActorSystem("AllreduceSystem",
+        ConfigFactory
+            .parseString("akka.remote.netty.hostname=\"" + host + "\"\n akka.remote.netty.port=\"" + port + "\"")
+            .withFallback(ConfigFactory.load()))
+
+    val master = system.actorOf(Props[TreeMaster], name = "TreeMaster")
+
+    master ! NumNodes(numNodes)
+  }
+
+}
+
+class Allreduce(host: String, port: Int, id: Int) {
 
   implicit val timeout = Timeout(5 seconds)
 
@@ -126,21 +141,26 @@ class Allreduce(masterHostAndPort: (String, Int), id: Int) {
   private def init(): Unit = {
     val system = ActorSystem("AllreduceSystem",
         ConfigFactory
-            .parseString("akka.remote.netty.hostname=\"" + masterHostAndPort._1 + "\"\n akka.remote.netty.port=\"" + (masterHostAndPort._2 + id + 1) + "\"")
+            .parseString("akka.remote.netty.hostname=\"" + port + "\"\n akka.remote.netty.port=\"" + (port + id + 1) + "\"")
             .withFallback(ConfigFactory.load()))
 
-    val master = system.actorFor("akka://AllreduceSystem@" + masterHostAndPort._1 + ":" + masterHostAndPort._2 + "/user/TreeMaster")
+    val master = system.actorFor("akka://AllreduceSystem@" + host + ":" + port + "/user/TreeMaster")
 
     me = system.actorOf(Props[ARActor], name = "AllreduceActor" + id)
     Await.result(master ? Node(me, id), 5 seconds)
     println("Recieved reponse from TreeMaster..")
   }
 
-  def allReduce(a: Array[Double]): Array[Double] = {
+  def allReduce(a: Array[Double]): Unit = {
     if (me eq null)
       init()
     val future = (me ? Side(a))
-    Await.result(future, atMost = 5 seconds).asInstanceOf[Down].a
+    val res = Await.result(future, atMost = 5 seconds).asInstanceOf[Down].a
+    var i = 0
+    while (i < res.size) {
+      a(i) = res(i)
+      i += 1
+    }
   }
 
 }
@@ -161,14 +181,7 @@ object Runner {
       val port = args(2).toInt
       val n = args(3).toInt
 
-      val system = ActorSystem("AllreduceSystem",
-          ConfigFactory
-              .parseString("akka.remote.netty.hostname=\"" + host + "\"\n akka.remote.netty.port=\"" + port + "\"")
-              .withFallback(ConfigFactory.load()))
-
-      val master = system.actorOf(Props[TreeMaster], name = "TreeMaster")
-
-      master ! NumNodes(n)
+      AllreduceMaster(host, port, n)
 
     }
     else {
@@ -177,13 +190,14 @@ object Runner {
       val port = args(1).toInt
       val id = args(2).toInt
 
-      val a = new Allreduce((host, port), id)
+      val a = new Allreduce(host, port, id)
 
       var i = 1
       while (true) {
         val v = Array.fill[Double](5)(id.toDouble * i)
         println("v: " + v.mkString(", "))
-        println(a.allReduce(v).mkString(", "))
+        a.allReduce(v)
+        println(v.mkString(", "))
         Thread.sleep(300)
         i += 1
       }
